@@ -100,11 +100,19 @@ public class Animal
 
 
 
+
+  /**
+   * FIX: Implemented the toString() method to match the format
+   * expected by the AnimalTest.
+   */
   @Override
-  public String toString() {
-    return String.format(
-        "| ID: %-5d | RegNo: %-10s | Weight: %-7.2f kg |",
-        id, regNo, weight
-    );
+  public String toString()
+  {
+    return "Animal{" +
+        "id=" + id +
+        ", weight=" + weight +
+        ", regNo='" + regNo + '\'' +
+        ", isButchered=" + isButchered +
+        '}';
   }
 }

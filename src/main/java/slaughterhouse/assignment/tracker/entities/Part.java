@@ -12,6 +12,8 @@ public class Part
   private PartType type;
   private double weight;
   private Integer trayId;
+  private boolean isPackaged; //to handle the case where a tray still has parts but a part or more were packed (removed from it)
+  private Integer productId; //to make everything perfectly traceable
 
   //JPA requirement: Public or protected no-argument constructor
   //protected reserves this constructor for JPA only
@@ -25,6 +27,8 @@ public class Part
     this.animalId = animalId;
     this.weight = weight;
     this.trayId = null;
+    this.isPackaged = false; //false because it's created in the butchering service
+    this.productId = null;//since it becomes part of a product only at the end of the processing
   }
 
   public int getId()
@@ -75,5 +79,25 @@ public class Part
   public void setTrayId(Integer trayId)
   {
     this.trayId = trayId;
+  }
+
+  public boolean isPackaged()
+  {
+    return isPackaged;
+  }
+
+  public void setPackaged(boolean packaged)
+  {
+    isPackaged = packaged;
+  }
+
+  public Integer getProductId()
+  {
+    return productId;
+  }
+
+  public void setProductId(Integer productId)
+  {
+    this.productId = productId;
   }
 }

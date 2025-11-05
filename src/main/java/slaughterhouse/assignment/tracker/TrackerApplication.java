@@ -1,5 +1,26 @@
 package slaughterhouse.assignment.tracker;
 
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableAsync; // NEW IMPORT
+
+@SpringBootApplication
+@EnableJpaRepositories // Ensure JPA repositories are scanned
+@EnableAsync // REQUIRED to process @Async event listeners
+public class TrackerApplication
+{
+  public static void main(String[] args) {
+    SpringApplication.run(TrackerApplication.class, args);
+  }
+}
+
+
+
+
+
+/*
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -8,7 +29,6 @@ import slaughterhouse.assignment.tracker.entities.Animal;
 import slaughterhouse.assignment.tracker.services.ReceptionService;
 
 import java.util.List;
-
 @Async
 @SpringBootApplication public class TrackerApplication
 {
@@ -79,3 +99,5 @@ import java.util.List;
   }
 
 }
+
+ */

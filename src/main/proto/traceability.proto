@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+option java_package = "slaughterhouse.assignment.grpc";
+option java_multiple_files = true;
+// NOTE: These options will generate Java classes in the 'slaughterhouse.assignment.grpc' package.
+
+// --- Request Messages ---
+
+// Used to look up animals by a Product's ID.
+message ProductId {
+  int32 id = 1; // Corresponds to the ID of the Product entity.
+}
+
+// Used to look up products by an Animal's identifier (either ID or RegNo).
+message AnimalLookup {
+  oneof identifier {
+    int32 id = 1;
+    string reg_no = 2;
+  }
+}
+
+// --- Response Messages ---
+
+// Represents the registration number of a single animal.
+message AnimalRegNo {
+  string reg_no = 1;
+}
+
+// Response container for multiple animal registration numbers.
+message AnimalRegNoList {
+  repeated AnimalRegNo reg_nos = 1;
+}
+
+// Represents a product's identifier returned by the system.
+message ProductIdentifier {
+  int32 product_id = 1;
+  // This field will hold the class name (e.g., "SameTypeProduct", "HalfAnimalProduct")
+  string product_type = 2;
+}
+
+// Response container for multiple product identifiers.
+message ProductIdentifierList {
+  repeated ProductIdentifier products = 1;
+}
+
+// --- Service Definition ---
+
+// Service for accessing traceability information across the slaughterhouse process.
+service TraceabilityService {
+
+  // R1: Retrieves registration numbers for all animals that contributed to a product.
+  rpc GetAnimalRegNosByProduct(ProductId) returns (AnimalRegNoList);
+
+  // R2: Retrieves all products an animal has been involved in (by ID or RegNo).
+  rpc GetProductsByAnimal(AnimalLookup) returns (ProductIdentifierList);
+}

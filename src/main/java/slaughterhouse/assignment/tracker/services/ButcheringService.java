@@ -2,6 +2,7 @@ package slaughterhouse.assignment.tracker.services;
 
 import jakarta.transaction.Transactional;
 import org.springframework.context.event.EventListener;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import slaughterhouse.assignment.tracker.entities.Animal;
@@ -9,6 +10,7 @@ import slaughterhouse.assignment.tracker.entities.Part;
 import slaughterhouse.assignment.tracker.entities.PartType;
 import slaughterhouse.assignment.tracker.entities.Tray;
 import slaughterhouse.assignment.tracker.events.AnimalArrivedEvent;
+import slaughterhouse.assignment.tracker.events.TrayFullEvent;
 import slaughterhouse.assignment.tracker.repository.AnimalRepository;
 import slaughterhouse.assignment.tracker.repository.PartRepository;
 import slaughterhouse.assignment.tracker.repository.TrayRepository;
@@ -22,13 +24,15 @@ public class ButcheringService
   private AnimalRepository animalRepository;
   private PartRepository partRepository;
   private TrayRepository trayRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
   public ButcheringService(AnimalRepository animalRepository,
       PartRepository partRepository,
-      TrayRepository trayRepository) {
+      TrayRepository trayRepository, ApplicationEventPublisher eventPublisher) {
     this.animalRepository = animalRepository;
     this.partRepository = partRepository;
     this.trayRepository = trayRepository;
+    this.eventPublisher = eventPublisher;
   }
 
   @Async
@@ -152,6 +156,9 @@ public class ButcheringService
             currentTray.isFull = true;
             trayRepository.save(currentTray);
             System.out.println("   [Traying] Tray " + currentTray.getId() + " is now full. Moving to next.");
+
+            //tray full event
+            eventPublisher.publishEvent(new TrayFullEvent(currentTray.getId()));
           }
 
           // 2. Move to the next available tray from the initial list or set to null to force creation.

@@ -15,6 +15,14 @@ import java.util.List;
   // search by the Part Type (the Enum itself)
   // Hibernate automatically converts the PartType enum value to the stored String/Ordinal for the query.
   List<Part> findByType(PartType type);
+  List<Part> findByTrayId(Integer trayId);
   //find by Trayed status
-  List<Part> findByIsTrayed(boolean isTrayed);
+  List<Part> findByTrayIdIsNull();
+  List<Part> findByTrayIdIsNotNull();
+  //find by packed status (relevant if not yet packaged)
+  List<Part> findByIsPackagedIsFalse();
+  // Combined conditions: available for HalfAnimalProduct packaging (in a tray, not packaged)
+  List<Part> findByTrayIdIsNotNullAndIsPackagedIsFalse();
+  //find by package id
+  List<Part> findByProductId(int packageId);
 }

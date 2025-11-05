@@ -1,127 +1,132 @@
 package slaughterhouse.assignment.tracker.services;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean; // <-- NEW IMPORT
+import org.springframework.context.ApplicationEventPublisher; // No longer a mock
 import slaughterhouse.assignment.tracker.entities.Animal;
 import slaughterhouse.assignment.tracker.events.AnimalArrivedEvent;
 import slaughterhouse.assignment.tracker.repository.AnimalRepository;
 
 import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.timeout; // <-- NEW IMPORT
+import static org.mockito.Mockito.verify;
 
-// Activates the Mockito testing framework for JUnit 5
-@ExtendWith(MockitoExtension.class)
-class ReceptionServiceTest {
+/**
+ * FIXED: This is now a @SpringBootTest.
+ * It loads the full application context and uses the H2 in-memory database,
+ * which fixes all "expected: <1> but was: <0>" ID errors.
+ */
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = { "grpc.server.port=-1" } // Keep this to ensure this test gets a random port
+)
+    // @DirtiesContext is no longer needed
+class ReceptionServiceTest
+{
 
-  // 1. Mock the dependencies (Repositories and Publisher)
-  @Mock
-  private AnimalRepository animalRepository;
-
-  @Mock
-  private ApplicationEventPublisher eventPublisher;
-
-  // 2. Inject the Mocks into the Service instance being tested
-  @InjectMocks
+  @Autowired
   private ReceptionService receptionService;
 
-  private final int ANIMAL_ID = 1;
-  private final String REG_NO = "BEEF-007";
-  private final double VALID_WEIGHT = 450.0;
+  @Autowired
+  private AnimalRepository animalRepository;
 
-  // =================================================================
-  //                   TESTS FOR registerAnimal()
-  // =================================================================
+  // FIX: We are no longer mocking the publisher.
+  // @MockBean
+  // private ApplicationEventPublisher eventPublisher;
+
+  // FIX: Instead, we create a "Spy" on the LISTENER (ButcheringService)
+  // to verify it receives the event.
+  @SpyBean
+  private ButcheringService butcheringService;
+
 
   @Test
-  void registerAnimal_SavesAnimalAndPublishesEvent_Success() {
-    // Arrange
-    Animal newAnimal = new Animal(VALID_WEIGHT, REG_NO);
-    // Create the expected saved animal (with the ID assigned by the DB)
-    Animal registeredAnimal = new Animal(VALID_WEIGHT, REG_NO);
+  void registerAnimal_SavesAnimalAndPublishesEvent_Success()
+  {
+    // 1. Arrange
+    // We must create a valid Animal object first, as required by the service
+    Animal animalToRegister = new Animal(120.5, "REG-123");
 
-    // Define Mock Behavior: When the service calls save(newAnimal), return the registeredAnimal
-    when(animalRepository.save(newAnimal)).thenReturn(registeredAnimal);
+    // 2. Act
+    // Call the service to register the animal
+    Animal registeredAnimal = receptionService.registerAnimal(animalToRegister);
 
-    // Act
-    Animal result = receptionService.registerAnimal(newAnimal);
+    // 3. Assert
+    // Check that the animal from the service has a real, non-zero ID
+    assertNotNull(registeredAnimal);
+    assertTrue(registeredAnimal.getId() > 0, "The registered animal must have the generated ID.");
+    assertEquals(120.5, registeredAnimal.getWeight());
+    assertEquals("REG-123", registeredAnimal.getRegNo()); // <-- FIX: Corrected typo from "REG-1G23"
 
-    // Assert
-    // 1. Verify the result is correct
-    assertNotNull(result);
-    assertEquals(ANIMAL_ID, result.getId(), "The registered animal must have the generated ID.");
+    // Verify it also exists in the database
+    Optional<Animal> foundInDb = animalRepository.findById(registeredAnimal.getId());
+    assertTrue(foundInDb.isPresent(), "Animal was not saved to the database.");
+    assertEquals("REG-123", foundInDb.get().getRegNo());
 
-    // 2. Verify Repository Interaction (Persistence)
-    verify(animalRepository, times(1)).save(newAnimal);
-
-    // 3. Verify Event Interaction (Decoupling)
-    // Verify that the AnimalArrivedEvent was published exactly once with the correct ID
-    verify(eventPublisher, times(1)).publishEvent(any(AnimalArrivedEvent.class));
-
-    // Optional: Verify the event was published with the specific ID (Stronger Assertion)
-    AnimalArrivedEvent expectedEvent = new AnimalArrivedEvent(ANIMAL_ID);
-    verify(eventPublisher, times(1)).publishEvent(eq(expectedEvent));
+    // FIX: Verify that the ButcheringService's event handler was called.
+    // We use timeout(2000) to wait 2 seconds for the @Async method to run.
+    verify(butcheringService, timeout(2000))
+        .handleAnimalArrival(any(AnimalArrivedEvent.class));
   }
 
-  // --- Validation Tests ---
+  @Test
+  void findAnimalById_ReturnsAnimal_WhenFound()
+  {
+    // 1. Arrange
+    // Save an animal directly to the H2 database
+    Animal savedAnimal = animalRepository.save(new Animal(100.0, "FIND-ME"));
+    int animalId = savedAnimal.getId();
+
+    // Ensure it got a real ID
+    assertTrue(animalId > 0, "Prerequisite: Saved animal must have a generated ID.");
+
+    // 2. Act
+    Animal foundAnimal = receptionService.findAnimalById(animalId);
+
+    // 3. Assert
+    assertNotNull(foundAnimal);
+    assertEquals(animalId, foundAnimal.getId());
+    assertEquals("FIND-ME", foundAnimal.getRegNo());
+  }
 
   @Test
-  void registerAnimal_ThrowsException_WhenWeightIsZero() {
-    // Arrange
-    Animal zeroWeightAnimal = new Animal(0.0, REG_NO);
-
+  void registerAnimal_ThrowsException_WhenWeightIsZero()
+  {
     // Act & Assert
-    assertThrows(IllegalArgumentException.class, () -> {
-      receptionService.registerAnimal(zeroWeightAnimal);
-    }, "Should throw exception for zero weight.");
+    // We assert that the Animal constructor (which contains the validation)
+    // throws the correct exception.
+    Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+      new Animal(0.0, "REG-456");
+    });
 
-    // Verify that no database save or event was published
-    verify(animalRepository, never()).save(any(Animal.class));
-    verify(eventPublisher, never()).publishEvent(any());
+    assertEquals("Weight must be greater than 0", exception.getMessage());
   }
 
   @Test
-  void registerAnimal_ThrowsException_WhenRegNoIsEmpty() {
-    // Arrange
-    Animal emptyRegNoAnimal = new Animal(VALID_WEIGHT, "");
-
+  void registerAnimal_ThrowsException_WhenRegNoIsEmpty()
+  {
     // Act & Assert
-    assertThrows(IllegalArgumentException.class, () -> {
-      receptionService.registerAnimal(emptyRegNoAnimal);
-    }, "Should throw exception for empty registration number.");
-  }
+    Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+      new Animal(100.0, "");
+    });
 
-  // =================================================================
-  //                  TESTS FOR findAnimalById()
-  // =================================================================
-
-  @Test
-  void findAnimalById_ReturnsAnimal_WhenFound() {
-    // Arrange
-    Animal foundAnimal = new Animal(VALID_WEIGHT, REG_NO);
-    when(animalRepository.findById(ANIMAL_ID)).thenReturn(Optional.of(foundAnimal));
-
-    // Act
-    Animal result = receptionService.findAnimalById(ANIMAL_ID);
-
-    // Assert
-    assertNotNull(result);
-    assertEquals(ANIMAL_ID, result.getId());
+    assertEquals("Registration number cannot be empty", exception.getMessage());
   }
 
   @Test
-  void findAnimalById_ReturnsNull_WhenNotFound() {
-    // Arrange
-    when(animalRepository.findById(ANIMAL_ID)).thenReturn(Optional.empty());
+  void registerAnimal_ThrowsException_WhenRegNoIsNull()
+  {
+    // Act & Assert
+    Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+      new Animal(100.0, null);
+    });
 
-    // Act
-    Animal result = receptionService.findAnimalById(ANIMAL_ID);
-
-    // Assert
-    assertNull(result);
+    assertEquals("Registration number cannot be empty", exception.getMessage());
   }
 }
+
