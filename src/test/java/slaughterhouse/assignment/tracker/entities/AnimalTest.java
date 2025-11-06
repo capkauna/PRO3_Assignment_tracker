@@ -82,8 +82,8 @@ class AnimalTest
 
   @Test void testToString()
   {
-    assertEquals("Animal{id=0, weight=100.0, regNo='REG123', isButchered=false}", animal.toString());
+    assertEquals("Animal{id=0, weight=100.0, regNo='REG123', registrationDate=null, origin='null', isButchered=false}", animal.toString());
     animal.markAsButchered();
-    assertEquals("Animal{id=0, weight=100.0, regNo='REG123', isButchered=true}", animal.toString());
+    assertEquals("Animal{id=0, weight=100.0, regNo='REG123', registrationDate=null, origin='null', isButchered=true}", animal.toString());
   }
 }

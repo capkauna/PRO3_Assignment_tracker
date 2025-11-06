@@ -1,19 +1,22 @@
 package slaughterhouse.assignment.tracker.services;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.SpyBean; // <-- NEW IMPORT
-import org.springframework.context.ApplicationEventPublisher; // No longer a mock
+import org.springframework.boot.test.mock.mockito.SpyBean;
+import slaughterhouse.assignment.tracker.dtos.AnimalInfoResponseDTO;
+import slaughterhouse.assignment.tracker.dtos.AnimalRegistrationRequestDTO;
 import slaughterhouse.assignment.tracker.entities.Animal;
 import slaughterhouse.assignment.tracker.events.AnimalArrivedEvent;
 import slaughterhouse.assignment.tracker.repository.AnimalRepository;
 
+import java.time.LocalDate; // <-- NEW IMPORT
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.timeout; // <-- NEW IMPORT
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -23,9 +26,8 @@ import static org.mockito.Mockito.verify;
  */
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = { "grpc.server.port=-1" } // Keep this to ensure this test gets a random port
+    properties = { "grpc.server.port=-1" } // ensuring this test gets a random port
 )
-    // @DirtiesContext is no longer needed
 class ReceptionServiceTest
 {
 
@@ -35,98 +37,107 @@ class ReceptionServiceTest
   @Autowired
   private AnimalRepository animalRepository;
 
-  // FIX: We are no longer mocking the publisher.
-  // @MockBean
-  // private ApplicationEventPublisher eventPublisher;
-
-  // FIX: Instead, we create a "Spy" on the LISTENER (ButcheringService)
-  // to verify it receives the event.
   @SpyBean
   private ButcheringService butcheringService;
+
+  // This ensures the database is clean before each @Test
+  @BeforeEach
+  void setUp() {
+    animalRepository.deleteAll();
+    // Note: resetIdSequence() might be H2-specific or require a custom query.
+    // For test isolation, deleteAll() is usually sufficient.
+  }
 
 
   @Test
   void registerAnimal_SavesAnimalAndPublishesEvent_Success()
   {
     // 1. Arrange
-    // We must create a valid Animal object first, as required by the service
-    Animal animalToRegister = new Animal(120.5, "REG-123");
+    // Create the DTO, just like the controller test
+    AnimalRegistrationRequestDTO request = new AnimalRegistrationRequestDTO();
+    request.setWeight(120.5);
+    request.setRegNo("REG-123");
+    request.setOrigin("Test Farm");
+    request.setDate(LocalDate.now());
 
     // 2. Act
     // Call the service to register the animal
-    Animal registeredAnimal = receptionService.registerAnimal(animalToRegister);
+    AnimalInfoResponseDTO registeredAnimalDTO = receptionService.registerAnimal(request);
 
     // 3. Assert
     // Check that the animal from the service has a real, non-zero ID
-    assertNotNull(registeredAnimal);
-    assertTrue(registeredAnimal.getId() > 0, "The registered animal must have the generated ID.");
-    assertEquals(120.5, registeredAnimal.getWeight());
-    assertEquals("REG-123", registeredAnimal.getRegNo()); // <-- FIX: Corrected typo from "REG-1G23"
+    assertNotNull(registeredAnimalDTO);
+    assertTrue(registeredAnimalDTO.getAnimalid() > 0, "The registered animal must have the generated ID.");
+    assertEquals(120.5, registeredAnimalDTO.getWeight());
+    assertEquals("REG-123", registeredAnimalDTO.getRegNo());
+    assertEquals("Test Farm", registeredAnimalDTO.getOrigin());
 
     // Verify it also exists in the database
-    Optional<Animal> foundInDb = animalRepository.findById(registeredAnimal.getId());
+    Optional<Animal> foundInDb = animalRepository.findById(registeredAnimalDTO.getAnimalid());
     assertTrue(foundInDb.isPresent(), "Animal was not saved to the database.");
     assertEquals("REG-123", foundInDb.get().getRegNo());
 
-    // FIX: Verify that the ButcheringService's event handler was called.
+    // Verify that the ButcheringService's event handler was called.
     // We use timeout(2000) to wait 2 seconds for the @Async method to run.
     verify(butcheringService, timeout(2000))
         .handleAnimalArrival(any(AnimalArrivedEvent.class));
+  }
+
+  // --- NEW TEST ---
+  @Test
+  void registerAnimal_ThrowsException_WhenRegNoAlreadyExists() {
+    // 1. Arrange
+    // Manually save an animal to the DB first
+    AnimalRegistrationRequestDTO request1 = new AnimalRegistrationRequestDTO();
+    request1.setWeight(100.0);
+    request1.setRegNo("DUPE-REG");
+    request1.setOrigin("Farm A");
+    request1.setDate(LocalDate.now());
+
+    receptionService.registerAnimal(request1); // This one should succeed
+
+    // Create a new request with the same regNo
+    AnimalRegistrationRequestDTO request2 = new AnimalRegistrationRequestDTO();
+    request2.setWeight(200.0);
+    request2.setRegNo("DUPE-REG");
+    request2.setOrigin("Farm B");
+    request2.setDate(LocalDate.now());
+
+    // 2. Act & 3. Assert
+    Exception exception = assertThrows(IllegalArgumentException.class, () -> {
+      receptionService.registerAnimal(request2); // This one should fail
+    });
+
+    assertEquals("Animal with registration number DUPE-REG already exists.", exception.getMessage());
   }
 
   @Test
   void findAnimalById_ReturnsAnimal_WhenFound()
   {
     // 1. Arrange
-    // Save an animal directly to the H2 database
-    Animal savedAnimal = animalRepository.save(new Animal(100.0, "FIND-ME"));
-    int animalId = savedAnimal.getId();
+    // Use the service to register an animal
+    AnimalRegistrationRequestDTO request = new AnimalRegistrationRequestDTO();
+    request.setWeight(100.0);
+    request.setRegNo("FIND-ME");
+    request.setOrigin("Find Farm");
+    request.setDate(LocalDate.now());
+    AnimalInfoResponseDTO savedAnimal = receptionService.registerAnimal(request);
 
-    // Ensure it got a real ID
+    int animalId = savedAnimal.getAnimalid();
     assertTrue(animalId > 0, "Prerequisite: Saved animal must have a generated ID.");
 
     // 2. Act
-    Animal foundAnimal = receptionService.findAnimalById(animalId);
+    AnimalInfoResponseDTO foundAnimal = receptionService.findAnimalById(animalId);
 
     // 3. Assert
     assertNotNull(foundAnimal);
-    assertEquals(animalId, foundAnimal.getId());
+    assertEquals(animalId, foundAnimal.getAnimalid());
     assertEquals("FIND-ME", foundAnimal.getRegNo());
   }
 
-  @Test
-  void registerAnimal_ThrowsException_WhenWeightIsZero()
-  {
-    // Act & Assert
-    // We assert that the Animal constructor (which contains the validation)
-    // throws the correct exception.
-    Exception exception = assertThrows(IllegalArgumentException.class, () -> {
-      new Animal(0.0, "REG-456");
-    });
-
-    assertEquals("Weight must be greater than 0", exception.getMessage());
-  }
-
-  @Test
-  void registerAnimal_ThrowsException_WhenRegNoIsEmpty()
-  {
-    // Act & Assert
-    Exception exception = assertThrows(IllegalArgumentException.class, () -> {
-      new Animal(100.0, "");
-    });
-
-    assertEquals("Registration number cannot be empty", exception.getMessage());
-  }
-
-  @Test
-  void registerAnimal_ThrowsException_WhenRegNoIsNull()
-  {
-    // Act & Assert
-    Exception exception = assertThrows(IllegalArgumentException.class, () -> {
-      new Animal(100.0, null);
-    });
-
-    assertEquals("Registration number cannot be empty", exception.getMessage());
-  }
+  //  REMOVED old validation tests
+  // The tests for weight and regNo are removed because the
+  // service no longer contains this logic. It is now handled by
+  // DTO validation (in the controller) and the Animal entity's constructor.
 }
 

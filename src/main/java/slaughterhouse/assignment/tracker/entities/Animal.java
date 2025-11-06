@@ -5,6 +5,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 
+import java.time.LocalDate;
+
 @Entity
 public class Animal
 {
@@ -13,6 +15,8 @@ public class Animal
   private int id;
   private double weight;
   private String regNo;
+  private LocalDate registrationDate;
+  private String origin;
   private boolean isButchered;
 
   //JPA requirement: Public or protected no-argument constructor
@@ -29,6 +33,14 @@ public class Animal
     this.weight = weight;
     this.regNo = regNo;
     this.isButchered = false;
+  }
+
+  //for creating animals with the new attributes toolDate and origin
+  public Animal(double weight, String regNo, LocalDate registrationDate, String origin)
+  {
+    this(weight, regNo);//this calls the other constructor, allows the new attributes to be set later too and reduces boilerplate code (the checks already in place, for example)
+    this.registrationDate = registrationDate;
+    this.origin = origin;
   }
 
   public int getId()
@@ -69,6 +81,25 @@ public class Animal
     this.isButchered = isButchered;
   }
 
+  public LocalDate getRegistrationDate()
+  {
+    return registrationDate;
+  }
+
+  public void setRegistrationDate(LocalDate registrationDate)
+  {
+    this.registrationDate = registrationDate;
+  }
+
+  public String getOrigin()
+  {
+    return origin;
+  }
+
+  public void setOrigin(String origin)
+  {
+    this.origin = origin;
+  }
   //marker
 
   public void markAsButchered()
@@ -112,6 +143,8 @@ public class Animal
         "id=" + id +
         ", weight=" + weight +
         ", regNo='" + regNo + '\'' +
+        ", registrationDate=" + registrationDate +
+        ", origin='" + origin + '\'' +
         ", isButchered=" + isButchered +
         '}';
   }

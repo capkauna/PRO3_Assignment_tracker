@@ -7,13 +7,16 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import slaughterhouse.assignment.tracker.entities.Animal;
 
-
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 @Repository public interface AnimalRepository extends JpaRepository<Animal, Integer>
 {
-  //spring automatically creates the methods for us
+
   Optional<Animal> findByRegNo(String species);
+  List<Animal> findByOrigin(String origin);
+  List<Animal> findByRegistrationDate(LocalDate date);
 
   //for testing resetting the id counter
 
