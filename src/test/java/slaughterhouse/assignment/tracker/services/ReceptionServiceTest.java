@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.test.annotation.DirtiesContext;
 import slaughterhouse.assignment.tracker.dtos.AnimalInfoResponseDTO;
 import slaughterhouse.assignment.tracker.dtos.AnimalRegistrationRequestDTO;
 import slaughterhouse.assignment.tracker.entities.Animal;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.verify;
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = { "grpc.server.port=-1" } // ensuring this test gets a random port
 )
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class ReceptionServiceTest
 {
 

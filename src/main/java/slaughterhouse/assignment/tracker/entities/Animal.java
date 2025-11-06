@@ -1,9 +1,6 @@
 package slaughterhouse.assignment.tracker.entities;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 
 import java.time.LocalDate;
 
@@ -14,7 +11,9 @@ public class Animal
   @GeneratedValue(strategy = GenerationType.IDENTITY) // DB handles ID generation
   private int id;
   private double weight;
+  @Column(unique = true, nullable = false)
   private String regNo;
+
   private LocalDate registrationDate;
   private String origin;
   private boolean isButchered;
@@ -142,9 +141,9 @@ public class Animal
     return "Animal{" +
         "id=" + id +
         ", weight=" + weight +
-        ", regNo='" + regNo + '\'' +
+        ", regNo=" + regNo +
         ", registrationDate=" + registrationDate +
-        ", origin='" + origin + '\'' +
+        ", origin=" + origin +
         ", isButchered=" + isButchered +
         '}';
   }
